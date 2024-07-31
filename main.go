@@ -24,7 +24,10 @@ func main() {
 	mux.HandleFunc("/api/reset", cfg.ResetHits)
 
 	mux.HandleFunc("GET /api/chirps", db.HandleGetChirpsRequest)
+	mux.HandleFunc("GET /api/chirps/{chirpId}", db.HandleGetChirpRequest)
 	mux.HandleFunc("POST /api/chirps", db.HandlePostChirpsRequest)
+	mux.HandleFunc("POST /api/users", db.HandlePostUsers)
+	mux.HandleFunc("POST /api/login", db.HandleLoginRequest)
 
 	ser := &http.Server{
 		Addr:    ":8080",
