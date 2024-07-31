@@ -17,8 +17,9 @@ type response struct {
 }
 
 type DB struct {
-	path string
-	mux  *sync.RWMutex
+	path   string
+	mux    *sync.RWMutex
+	secret string
 }
 
 type DBStructure struct {
@@ -74,8 +75,8 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 
 // NewDB creates a new database connection
 // and creates the database file if it doesn't exist
-func NewDB(fpath string) (*DB, error) {
-	db := &DB{path: fpath, mux: &sync.RWMutex{}}
+func NewDB(fpath, secret string) (*DB, error) {
+	db := &DB{path: fpath, mux: &sync.RWMutex{}, secret: secret}
 	db.ensureDB()
 	return db, nil
 }

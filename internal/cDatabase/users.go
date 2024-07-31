@@ -6,7 +6,11 @@ import (
 	"internal/api"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,14 +20,39 @@ type User struct {
 	Password string `json:"password"`
 }
 
+type UserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type UserResponse struct {
 	Id    int    `json:"id"`
 	Email string `json:"email"`
 }
 
-type UserRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type UserLoginRequest struct {
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	ExpireTime int    `json:"expires_in_seconds"`
+}
+
+type UserLoginResponse struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
+func CreateJWTAuthToken(id, expireTime int) *jwt.Token {
+
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.RegisteredClaims{
+			Issuer:    "chirpy",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expireTime) * time.Second)),
+			Subject:   strconv.Itoa(id),
+		},
+	)
+	return t
 }
 
 func (db *DB) createUser(email, password string) (User, error) {
@@ -40,14 +69,16 @@ func (db *DB) createUser(email, password string) (User, error) {
 		return User{}, err
 	}
 
-	id := len(dbStruct.Users) + 1
 	pword, err := bcrypt.GenerateFromPassword([]byte(password), 1)
 	if err != nil {
 		log.Print(err.Error())
 	}
+
+	id := len(dbStruct.Users) + 1
 	newUser := User{Id: id, Email: email, Password: string(pword)}
 	dbStruct.Users[id] = newUser
 	db.writeDB(dbStruct)
+
 	return newUser, nil
 }
 
@@ -79,22 +110,12 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	/*
-		dat, err := json.Marshal(response)
-		if err != nil {
-			log.Print(err.Error())
-			w.WriteHeader(500)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(201)
-		w.Write(dat)*/
 }
 
 func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
-	var request UserRequest
+	var request UserLoginRequest
 
 	err := decoder.Decode(&request)
 	if err != nil {
@@ -114,31 +135,51 @@ func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userResp := UserResponse{Id: user.Id, Email: user.Email}
-	dat, err := json.Marshal(userResp)
+	t := CreateJWTAuthToken(user.Id, request.ExpireTime)
+	s, err := t.SignedString([]byte(db.secret))
+	if err != nil {
+		log.Print("SIGN ERROR", err.Error())
+	}
+
+	userResp := UserLoginResponse{Id: user.Id, Email: user.Email, Token: s}
+	err = api.SendJson(w, r, userResp, 200)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	w.Write(dat)
 }
 
 func (db *DB) getUserByEmail(email string) (User, error) {
 	dbStruct, err := db.loadDB()
 	if err != nil {
-		log.Print("getUserByEmail, loaddb failed")
 		return User{}, errors.New("failed to load db")
 	}
 
 	for _, item := range dbStruct.Users {
 		if item.Email == email {
-			log.Print("getUserByEmail, email found")
 			return item, nil
 		}
 	}
-	log.Print("getUserByEmail, email not found")
 	return User{}, errors.New("User not found")
+}
+
+func (db *DB) HandlePutUsersRequest(w http.ResponseWriter, r *http.Request) {
+	var response UserRequest
+	err := api.RecieveJson(w, r, &response)
+	if err != nil {
+		log.Print(err.Error())
+		return
+	}
+	header := r.Header.Get("Authorization")
+	AuthString := strings.Split(header, " ")
+	t := AuthString[1]
+	//log.Print("PUT REQUEST HEADER TOKEN: ", t)
+	valid, err := jwt.ParseWithClaims(t, jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(db.secret), nil
+	})
+	if err != nil {
+		log.Print("Put Users Parse With Claims: ", err.Error())
+		return
+	}
+	log.Print(valid.Claims.GetIssuer())
 }

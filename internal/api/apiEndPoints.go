@@ -38,6 +38,7 @@ func (cfg *ApiConfig) ResetHits(w http.ResponseWriter, r *http.Request) {
 
 type ApiConfig struct {
 	fileserverHits int
+	JwtSecret      string
 }
 
 func (cfg *ApiConfig) MiddlewareMetricsInc(next http.Handler) http.Handler {
