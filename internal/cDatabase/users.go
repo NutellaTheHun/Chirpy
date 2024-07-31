@@ -3,6 +3,7 @@ package cDatabase
 import (
 	"encoding/json"
 	"errors"
+	"internal/api"
 	"log"
 	"net/http"
 
@@ -26,6 +27,7 @@ type UserRequest struct {
 }
 
 func (db *DB) createUser(email, password string) (User, error) {
+
 	dbStruct, err := db.loadDB()
 	if err != nil {
 		log.Print("createUser, loadDB")
@@ -50,14 +52,17 @@ func (db *DB) createUser(email, password string) (User, error) {
 }
 
 func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
+
 	var request UserRequest
+	decoder := json.NewDecoder(r.Body)
+
 	err := decoder.Decode(&request)
 	if err != nil {
 		log.Print(err.Error())
 		w.WriteHeader(500)
 		return
 	}
+
 	user, err := db.createUser(request.Email, request.Password)
 	if err != nil {
 		log.Print(err.Error())
@@ -68,15 +73,22 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 	//trim pword
 	response := UserResponse{Id: user.Id, Email: user.Email}
 
-	dat, err := json.Marshal(response)
+	err = api.SendJson(w, r, response, 201)
 	if err != nil {
 		log.Print(err.Error())
 		w.WriteHeader(500)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	w.Write(dat)
+	/*
+		dat, err := json.Marshal(response)
+		if err != nil {
+			log.Print(err.Error())
+			w.WriteHeader(500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(201)
+		w.Write(dat)*/
 }
 
 func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
