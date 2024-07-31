@@ -71,18 +71,11 @@ func (db *DB) HandleGetChirpRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		return
 	}
-	api.SendJson(w, r, chirp, 200)
+
+	err = api.SendJson(w, r, chirp, 200)
 	if err != nil {
 		log.Print("getChirpById, SendJSON ", err.Error())
 	}
-	/*
-		dat, err := json.Marshal(chirp)
-		if err != nil {
-			log.Fatal("getChirpById, marshal ", err.Error())
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(dat)*/
 }
 
 func (db *DB) HandleGetChirpsRequest(w http.ResponseWriter, r *http.Request) {
@@ -95,16 +88,6 @@ func (db *DB) HandleGetChirpsRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print(err.Error())
 	}
-	/*
-		dat, err := json.Marshal(chirps)
-		if err != nil {
-			log.Print(err.Error())
-			w.WriteHeader(500)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(dat)*/
 }
 func (db *DB) HandlePostChirpsRequest(w http.ResponseWriter, r *http.Request) {
 	var respBody response
@@ -125,29 +108,4 @@ func (db *DB) HandlePostChirpsRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	/*
-		decoder := json.NewDecoder(r.Body)
-		var respBody response
-		err := decoder.Decode(&respBody)
-		if err != nil {
-			log.Print(err.Error())
-			w.WriteHeader(500)
-			return
-		}
-
-		chirp, err := db.CreateChirp(respBody.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		dat, err := json.Marshal(chirp)
-		if err != nil {
-			log.Print(err.Error())
-			w.WriteHeader(500)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(201)
-		w.Write(dat)*/
 }
