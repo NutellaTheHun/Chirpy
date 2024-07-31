@@ -28,18 +28,21 @@ type UserRequest struct {
 func (db *DB) createUser(email, password string) (User, error) {
 	dbStruct, err := db.loadDB()
 	if err != nil {
-		log.Printf("createUser, loadDB")
+		log.Print("createUser, loadDB")
 		return User{}, err
 	}
 
 	_, err = db.getUserByEmail(email)
 	if err == nil {
-		log.Printf("createUser, getUserByEmail")
+		log.Print("createUser, getUserByEmail")
 		return User{}, err
 	}
 
 	id := len(dbStruct.Users) + 1
 	pword, err := bcrypt.GenerateFromPassword([]byte(password), 1)
+	if err != nil {
+		log.Print(err.Error())
+	}
 	newUser := User{Id: id, Email: email, Password: string(pword)}
 	dbStruct.Users[id] = newUser
 	db.writeDB(dbStruct)
@@ -51,13 +54,13 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 	var request UserRequest
 	err := decoder.Decode(&request)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Print(err.Error())
 		w.WriteHeader(500)
 		return
 	}
 	user, err := db.createUser(request.Email, request.Password)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Print(err.Error())
 		w.WriteHeader(500)
 		return
 	}
@@ -67,7 +70,7 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 
 	dat, err := json.Marshal(response)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Print(err.Error())
 		w.WriteHeader(500)
 		return
 	}
@@ -83,29 +86,29 @@ func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 
 	err := decoder.Decode(&request)
 	if err != nil {
-		log.Printf("handleLoginRequest ", err.Error())
+		log.Print("handleLoginRequest ", err.Error())
 		w.WriteHeader(500)
 		return
 	}
-	log.Printf("handleLoginRequest decode")
+
 	user, err := db.getUserByEmail(request.Email)
 	if err != nil {
-
+		log.Print(err.Error())
 	}
-	log.Printf("handleLoginRequest getSUerEmail")
+
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
 	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
-	log.Printf("handleLoginRequest compareHash")
+
 	userResp := UserResponse{Id: user.Id, Email: user.Email}
 	dat, err := json.Marshal(userResp)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
-	log.Printf("handleLoginRequest marshall")
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(dat)
@@ -114,16 +117,16 @@ func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 func (db *DB) getUserByEmail(email string) (User, error) {
 	dbStruct, err := db.loadDB()
 	if err != nil {
-		log.Printf("getUserByEmail, loaddb failed")
+		log.Print("getUserByEmail, loaddb failed")
 		return User{}, errors.New("failed to load db")
 	}
 
 	for _, item := range dbStruct.Users {
 		if item.Email == email {
-			log.Printf("getUserByEmail, email found")
+			log.Print("getUserByEmail, email found")
 			return item, nil
 		}
 	}
-	log.Printf("getUserByEmail, email not found")
+	log.Print("getUserByEmail, email not found")
 	return User{}, errors.New("User not found")
 }
