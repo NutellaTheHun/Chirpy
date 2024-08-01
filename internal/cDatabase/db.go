@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 type Chirp struct {
@@ -22,9 +23,15 @@ type DB struct {
 	secret string
 }
 
+type RToken struct {
+	Token    string    `json:"token"`
+	ExpireAt time.Time `json:"expire_at"`
+}
+
 type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]User  `json:"users"`
+	Chirps  map[int]Chirp  `json:"chirps"`
+	Users   map[int]User   `json:"users"`
+	RTokens map[int]RToken `json:"r_tokens"`
 }
 
 // loadDB reads the database file into memory
@@ -40,8 +47,9 @@ func (db *DB) loadDB() (DBStructure, error) {
 
 	if len(dat) == 0 {
 		return DBStructure{
-			Chirps: make(map[int]Chirp),
-			Users:  make(map[int]User),
+			Chirps:  make(map[int]Chirp),
+			Users:   make(map[int]User),
+			RTokens: make(map[int]RToken),
 		}, nil
 	}
 

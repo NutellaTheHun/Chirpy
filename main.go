@@ -44,6 +44,10 @@ func main() {
 
 	mux.HandleFunc("POST /api/login", db.HandleLoginRequest)
 
+	mux.HandleFunc("POST /api/refresh", db.HandlePostRefresh)
+
+	mux.HandleFunc("POST /api/revoke", db.HandlePostRevoke)
+
 	ser := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
