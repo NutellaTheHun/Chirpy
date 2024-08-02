@@ -9,8 +9,9 @@ import (
 )
 
 type Chirp struct {
-	Id   int    `json:"id"`
-	Body string `json:"body"`
+	Id       int    `json:"id"`
+	Body     string `json:"body"`
+	AuthorId int    `json:"author_id"`
 }
 
 type response struct {
@@ -24,14 +25,14 @@ type DB struct {
 }
 
 type RToken struct {
-	Token    string    `json:"token"`
+	UserId   int       `json:"user_id"`
 	ExpireAt time.Time `json:"expire_at"`
 }
 
 type DBStructure struct {
-	Chirps  map[int]Chirp  `json:"chirps"`
-	Users   map[int]User   `json:"users"`
-	RTokens map[int]RToken `json:"r_tokens"`
+	Chirps  map[int]Chirp     `json:"chirps"`
+	Users   map[int]User      `json:"users"`
+	RTokens map[string]RToken `json:"r_tokens"`
 }
 
 // loadDB reads the database file into memory
@@ -49,7 +50,7 @@ func (db *DB) loadDB() (DBStructure, error) {
 		return DBStructure{
 			Chirps:  make(map[int]Chirp),
 			Users:   make(map[int]User),
-			RTokens: make(map[int]RToken),
+			RTokens: make(map[string]RToken),
 		}, nil
 	}
 

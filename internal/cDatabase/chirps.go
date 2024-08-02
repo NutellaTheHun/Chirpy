@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // CreateChirp creates a new chirp and saves it to disk
-func (db *DB) CreateChirp(body string) (Chirp, error) {
+func (db *DB) CreateChirp(body string, userId int) (Chirp, error) {
 
 	dbStruct, err := db.loadDB()
 	if err != nil {
@@ -18,7 +20,7 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 	}
 
 	id := len(dbStruct.Chirps) + 1
-	result := Chirp{Id: id, Body: body}
+	result := Chirp{Id: id, Body: body, AuthorId: userId}
 	dbStruct.Chirps[id] = result
 
 	db.writeDB(dbStruct)
@@ -89,6 +91,7 @@ func (db *DB) HandleGetChirpsRequest(w http.ResponseWriter, r *http.Request) {
 		log.Print(err.Error())
 	}
 }
+
 func (db *DB) HandlePostChirpsRequest(w http.ResponseWriter, r *http.Request) {
 	var respBody response
 	err := api.RecieveJson(w, r, &respBody)
@@ -97,7 +100,33 @@ func (db *DB) HandlePostChirpsRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 	}
 
-	chirp, err := db.CreateChirp(respBody.Body)
+	//VALIDATE USER,
+	//Get token
+	header := r.Header.Get("Authorization")
+	AuthString := strings.Split(header, " ")
+	tokenString := AuthString[1]
+
+	claims, err := db.DecodeJWTToken(tokenString)
+	if err != nil {
+		log.Print("PostChirps, DecodeToken:", err.Error())
+		w.WriteHeader(400)
+		return
+	}
+
+	if claims.ExpiresAt.Before(time.Now()) {
+		log.Print("POST Chirps, JWT Token expired")
+		w.WriteHeader(400)
+		return
+	}
+
+	authorId, err := strconv.Atoi(claims.Subject)
+	if err != nil {
+		log.Print("POST Chirps, strconv uId -> int", err.Error())
+		w.WriteHeader(400)
+		return
+	}
+
+	chirp, err := db.CreateChirp(respBody.Body, authorId) //Pass user id
 	if err != nil {
 		log.Fatal(err)
 	}

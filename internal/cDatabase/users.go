@@ -17,9 +17,10 @@ import (
 )
 
 type User struct {
-	Id       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Id           int    `json:"id"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type UserRequest struct {
@@ -97,13 +98,14 @@ func (db *DB) createUser(email, password string) (User, error) {
 
 	//Create user
 	id := len(dbStruct.Users) + 1
-	newUser := User{Id: id, Email: email, Password: string(pword)}
-	dbStruct.Users[id] = newUser
 
 	//Create Refresh Token
 	rTokenString := hex.EncodeToString([]byte(strconv.Itoa(r)))
 	expireAt := time.Now().Add(time.Duration(60*24) * time.Hour)
-	dbStruct.RTokens[id] = RToken{Token: rTokenString, ExpireAt: expireAt}
+	dbStruct.RTokens[rTokenString] = RToken{UserId: id, ExpireAt: expireAt}
+
+	newUser := User{Id: id, Email: email, Password: string(pword), RefreshToken: rTokenString}
+	dbStruct.Users[id] = newUser
 
 	//save
 	db.writeDB(dbStruct)
@@ -185,20 +187,14 @@ func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		return
 	}
-	//log.Print("REQUEST EXPIRE TIME:", request.ExpireTime)
+
 	t := CreateJWTAuthToken(user.Id, 2)
 	s, err := t.SignedString([]byte(db.secret))
 	if err != nil {
 		log.Print("SIGN ERROR", err.Error())
 	}
 
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		log.Print("Post Login, loadDB: ", err.Error())
-		w.WriteHeader(401)
-		return
-	}
-	userResp := UserLoginResponse{Id: user.Id, Email: user.Email, Token: s, RefreshToken: dbStruct.RTokens[user.Id].Token}
+	userResp := UserLoginResponse{Id: user.Id, Email: user.Email, Token: s, RefreshToken: user.RefreshToken}
 	err = api.SendJson(w, r, userResp, 200)
 	if err != nil {
 		w.WriteHeader(500)
@@ -286,28 +282,60 @@ func (db *DB) HandlePostRefresh(w http.ResponseWriter, r *http.Request) {
 	tokenString := split[1]
 
 	//Lookup token in DB
-	result, err := CreateAccessToken(tokenString)
+	userId, err := db.ValidateRefreshToken(tokenString)
 	if err != nil {
+		log.Print("PostRefresh, ValidateRToken:", err.Error())
 		w.WriteHeader(401)
 		return
 	}
+
 	//401 of NE or expire
+	if userId == 0 {
+		w.WriteHeader(401)
+		return
+	}
 
 	//200 return 1hr access token "token" : ${tokenString}
+	t := CreateJWTAuthToken(userId, 60*60)
+	s, err := t.SignedString([]byte(db.secret))
+	if err != nil {
+		log.Print("PostRefresh SIGN ERROR", err.Error())
+	}
+
+	api.SendJson(w, r, RefreshResponse{Token: s}, 200)
 }
 
-func (db *DB) CreateAccessToken(rToken string) (string, error) {
+func (db *DB) ValidateRefreshToken(rToken string) (int, error) {
 	dbStruct, err := db.loadDB()
 	if err != nil {
 		log.Print("CreateAccessToken loadDB:", err.Error())
-		return "", err
+		return 0, err
 	}
+	result := dbStruct.RTokens[rToken]
+	if result.ExpireAt.Before(time.Now()) {
+		return 0, errors.New("referesh token expired")
+	}
+
+	return result.UserId, nil
 }
 
 func (db *DB) HandlePostRevoke(w http.ResponseWriter, r *http.Request) {
+
 	//No request body, refresh token string in header  "Authorization: Bearer <token>"
+	header := r.Header.Get("Authorization")
+	split := strings.Split(header, " ")
+	rToken := split[1]
 
 	//Remove token from DB
+	dbStruct, err := db.loadDB()
+	if err != nil {
+		log.Print("PostRevoke loadDB: ", err.Error())
+		w.WriteHeader(400)
+		return
+	}
+	delete(dbStruct.RTokens, rToken)
+	db.writeDB(dbStruct)
 
 	//return 204
+	w.WriteHeader(204)
 }
