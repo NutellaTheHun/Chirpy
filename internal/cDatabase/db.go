@@ -19,9 +19,10 @@ type response struct {
 }
 
 type DB struct {
-	path   string
-	mux    *sync.RWMutex
-	secret string
+	path     string
+	mux      *sync.RWMutex
+	secret   string
+	polkaApi string
 }
 
 type RToken struct {
@@ -84,8 +85,8 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 
 // NewDB creates a new database connection
 // and creates the database file if it doesn't exist
-func NewDB(fpath, secret string) (*DB, error) {
-	db := &DB{path: fpath, mux: &sync.RWMutex{}, secret: secret}
+func NewDB(fpath, secret, polkaApi string) (*DB, error) {
+	db := &DB{path: fpath, mux: &sync.RWMutex{}, secret: secret, polkaApi: polkaApi}
 	db.ensureDB()
 	return db, nil
 }

@@ -17,9 +17,9 @@ func main() {
 		log.Print("godotenv error: ", err.Error())
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
-
+	polkaApi := os.Getenv("polka_api")
 	dbPath := "database.json"
-	db, err := cDatabase.NewDB(dbPath, jwtSecret)
+	db, err := cDatabase.NewDB(dbPath, jwtSecret, polkaApi)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,6 +38,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", db.HandleGetChirpsRequest)
 	mux.HandleFunc("GET /api/chirps/{chirpId}", db.HandleGetChirpRequest)
 	mux.HandleFunc("POST /api/chirps", db.HandlePostChirpsRequest)
+	mux.HandleFunc("DELETE /api/chirps/{chirpId}", db.HandleDeleteChirpsRequest)
 
 	mux.HandleFunc("POST /api/users", db.HandlePostUsers)
 	mux.HandleFunc("PUT /api/users", db.HandlePutUsersRequest)
@@ -47,6 +48,8 @@ func main() {
 	mux.HandleFunc("POST /api/refresh", db.HandlePostRefresh)
 
 	mux.HandleFunc("POST /api/revoke", db.HandlePostRevoke)
+
+	mux.HandleFunc("POST /api/polka/webhooks", db.HandlePolkaPostWebHook)
 
 	ser := &http.Server{
 		Addr:    ":8080",

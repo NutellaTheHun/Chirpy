@@ -56,7 +56,7 @@ func RecieveJson(w http.ResponseWriter, r *http.Request, s interface{}) error {
 	result := s
 	err := decoder.Decode(&result)
 	if err != nil {
-		return errors.New("Something went wrong")
+		return errors.New("recieve json decode error")
 	}
 	return nil
 }
@@ -68,6 +68,9 @@ func SendJson(w http.ResponseWriter, r *http.Request, s interface{}, statusCode 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write(response)
+	_, err = w.Write(response)
+	if err != nil {
+		return err
+	}
 	return nil
 }

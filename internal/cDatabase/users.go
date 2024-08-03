@@ -21,6 +21,7 @@ type User struct {
 	Email        string `json:"email"`
 	Password     string `json:"password"`
 	RefreshToken string `json:"refresh_token"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 type UserRequest struct {
@@ -29,8 +30,9 @@ type UserRequest struct {
 }
 
 type UserResponse struct {
-	Id    int    `json:"id"`
-	Email string `json:"email"`
+	Id          int    `json:"id"`
+	Email       string `json:"email"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 type UserLoginRequest struct {
@@ -44,6 +46,7 @@ type UserLoginResponse struct {
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 type RefreshResponse struct {
@@ -80,7 +83,7 @@ func (db *DB) createUser(email, password string) (User, error) {
 
 	_, err = db.getUserByEmail(email)
 	if err == nil {
-		log.Print("createUser, getUserByEmail:", err.Error())
+		log.Print("createUser, getUserByEmail: email exists")
 		return User{}, err
 	}
 
@@ -104,7 +107,7 @@ func (db *DB) createUser(email, password string) (User, error) {
 	expireAt := time.Now().Add(time.Duration(60*24) * time.Hour)
 	dbStruct.RTokens[rTokenString] = RToken{UserId: id, ExpireAt: expireAt}
 
-	newUser := User{Id: id, Email: email, Password: string(pword), RefreshToken: rTokenString}
+	newUser := User{Id: id, Email: email, Password: string(pword), RefreshToken: rTokenString, IsChirpyRed: false}
 	dbStruct.Users[id] = newUser
 
 	//save
@@ -142,14 +145,14 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&request)
 	if err != nil {
 		log.Print(err.Error())
-		w.WriteHeader(500)
+		w.WriteHeader(501)
 		return
 	}
 
 	user, err := db.createUser(request.Email, request.Password)
 	if err != nil {
-		log.Print(err.Error())
-		w.WriteHeader(500)
+		log.Print("PostUsers, CreateUser:", err.Error())
+		w.WriteHeader(502)
 		return
 	}
 
@@ -158,10 +161,11 @@ func (db *DB) HandlePostUsers(w http.ResponseWriter, r *http.Request) {
 
 	err = api.SendJson(w, r, response, 201)
 	if err != nil {
-		log.Print(err.Error())
-		w.WriteHeader(500)
+		log.Print("PostUsers, SendJson:", err.Error())
+		w.WriteHeader(503)
 		return
 	}
+
 }
 
 // {email, password, expires_in_seconds} -> {id, email, token}
@@ -194,12 +198,14 @@ func (db *DB) HandleLoginRequest(w http.ResponseWriter, r *http.Request) {
 		log.Print("SIGN ERROR", err.Error())
 	}
 
-	userResp := UserLoginResponse{Id: user.Id, Email: user.Email, Token: s, RefreshToken: user.RefreshToken}
+	userResp := UserLoginResponse{Id: user.Id, Email: user.Email, Token: s, RefreshToken: user.RefreshToken, IsChirpyRed: user.IsChirpyRed}
+
 	err = api.SendJson(w, r, userResp, 200)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
+
 }
 
 func (db *DB) getUserByEmail(email string) (User, error) {
@@ -213,7 +219,7 @@ func (db *DB) getUserByEmail(email string) (User, error) {
 			return item, nil
 		}
 	}
-	return User{}, errors.New("User not found")
+	return User{}, errors.New("getUserByEmail, User not found")
 }
 
 // { H{"Authorization: ${jwtToken}"}, {email, password} } -> {email, id}
@@ -338,4 +344,20 @@ func (db *DB) HandlePostRevoke(w http.ResponseWriter, r *http.Request) {
 
 	//return 204
 	w.WriteHeader(204)
+}
+
+func (db *DB) UpgradeUser(userId int) error {
+	dbStruct, err := db.loadDB()
+	if err != nil {
+		return errors.New("UpgradeUser loadDB failed")
+	}
+
+	user := dbStruct.Users[userId]
+	if user.Email == "" {
+		return errors.New("404")
+	}
+	user.IsChirpyRed = true
+	dbStruct.Users[userId] = user
+	db.writeDB(dbStruct)
+	return nil
 }
